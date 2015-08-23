@@ -1,4 +1,6 @@
 # PracticalMachineLearning
 Coursera Course
 
-yup
+Markdown file:  Project.Rmd
+
+HTML Output: Project.html
