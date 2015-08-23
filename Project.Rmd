@@ -1,0 +1,99 @@
+---
+title: "Practical Machine Learning Project"
+author: "Neal Meister"
+date: "August 21, 2015"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement â€“ a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+## Load and Clean Data
+
+First, load the caret library and prepare the training set for modeling...
+
+```{r}
+library(caret)
+train.all <- read.csv("../pml-training.csv", na.strings=c('', 'NA', '#DIV/0!'))
+
+head(train.all[,1:6])
+
+# The first 6 columns of data are observation descriptors, so just remove them...
+train.all <- train.all[, -c(1:6)]
+```
+
+There are an awful lot of numeric variables (154), so we're going to remove any columns that have little to no variance.  There are also many NAs scattered throughout the data, so we will impute missing data using 5 nearest neighbors.  
+
+```{r}
+# Get rid of columns that have near zero variance...
+zeroVar <- nearZeroVar(train.all, freqCut=90/10) 
+train.all <- train.all[, -c(zeroVar)]
+
+# Preprocess the full dataset to impute the rest of the missing values...
+# This will only work on the numeric variables, so save the target variable (classe)...
+classe <- train.all$classe
+train.all <- subset(train.all, select=-classe)
+
+knn.model <- preProcess(train.all, method="knnImpute", k= 5)
+train.all <- predict(knn.model, train.all)
+
+# replace the classe variable before we do the split...
+train.all$classe = classe
+```
+
+## Build the Model
+
+Now, we have a fairly clean dataset.  It's time to split the set into a training set and a testing set...
+
+```{r}
+train.index <- createDataPartition(train.all$classe, p=0.75, list=FALSE)
+training <- train.all[train.index,]
+testing <- train.all[-train.index,]
+```
+
+Try a Random Forest model using the training set. Use cross-validation in the train control with 5 folds.
+
+```{r echo=TRUE, eval=FALSE}
+set.seed(67890)
+model.rf <- train(classe ~ ., 
+                  data=training, 
+                  method="rf",
+                  trControl=trainControl(method='cv', 
+                                         number=5, 
+                                         repeats=20, 
+                                         classProbs=T, 
+                                         allowParallel=T)
+)
+
+#Save the model to disk because it takes forever to run!
+save(model.rf, file="model.rda")
+```
+
+```{r echo=FALSE}
+load("model.rda")
+```
+
+## Evaluate the Model
+
+How accurate is the model?  The finalModel output will show a confusion matrix and the error rate.
+
+```{r}
+model.rf$finalModel
+```
+
+The final model claims an error rate of only 0.2%. Fantastic; let's try it on the test set...
+
+```{r}
+# Predict the testing set...
+prediction <- predict(model.rf, testing)
+confusionMatrix(testing$classe, prediction)
+```
+
+## Conclusion
+
+The confusion matrix is showing that the model classified most of the test observations correctly with 99.8% accuracy.
+
+Have a nice day!
